@@ -3,7 +3,10 @@ import {
   CATEGORY_ROWS,
   CERT_ROWS,
   DEMAND_ROWS,
+  PERF_AI_CALLS,
+  PERF_CHAIN,
   PERF_ROWS,
+  PERF_SCORE_SOURCES,
   PO_ROWS,
   PORTFOLIO_ROWS,
   SOURCE_ROWS,
@@ -304,40 +307,127 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
         )}
         {tab === "绩效评价" && (
           <>
+            <div className="ai-calls">
+              {PERF_AI_CALLS.map((c) => (
+                <div className="ai-call" key={c.id}>
+                  <span className="ai-badge">AI 调用</span>
+                  <div>
+                    <b>{c.title}</b>
+                    <p>{c.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
             <table className="data">
               <thead>
                 <tr>
-                  <th>供应商</th><th>准时率</th><th>质量合格率</th><th>等级</th><th>策略</th>
+                  <th>供应商</th>
+                  <th>交期打分</th>
+                  <th>质量打分</th>
+                  <th>成本打分</th>
+                  <th>研发项目打分</th>
+                  <th>售后打分</th>
+                  <th>综合分</th>
+                  <th>等级</th>
+                  <th>策略</th>
                 </tr>
               </thead>
               <tbody>
                 {PERF_ROWS.map((r) => (
                   <tr key={r.name}>
-                    <td>{r.name}</td><td>{r.ontime}</td><td>{r.quality}</td>
+                    <td>
+                      <div>{r.name}</div>
+                      <div className="score-raw">{r.category}</div>
+                    </td>
+                    <td>
+                      <span className="score-num">{r.ontime}</span>
+                      <div className="score-raw">准时率 {r.ontimeRaw}</div>
+                    </td>
+                    <td>
+                      <span className="score-num">{r.quality}</span>
+                      <div className="score-raw">合格率 {r.qualityRaw}</div>
+                    </td>
+                    <td><span className="score-num">{r.cost}</span></td>
+                    <td><span className="score-num">{r.rd}</span></td>
+                    <td><span className="score-num">{r.afterSales}</span></td>
+                    <td><span className="score-num">{r.total}</span></td>
                     <td><Pill tone={r.grade.startsWith("A") ? "ok" : "warn"}>{r.grade}</Pill></td>
-                    <td>{r.strategy}</td>
+                    <td>
+                      {r.strategy}
+                      <div className="score-raw">AI 输出</div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="note">履约结果会回写供应商等级，并影响下次推荐顺序。准时率低于 90% 自动降级。</div>
-            <div className="panel-head" style={{ marginTop: 16 }}>
-              <h3>绩效标准</h3>
-              <span>准时、质量、价格与配合度共同决定推荐权重</span>
+            <div className="note">
+              交期分、质量分由准时率、质量合格率线性换算，与成本、研发、售后一并加权。交期分低于 90 限制紧急单；综合分 ≥95 为 A，90–94 为 A-，80–89 为 B。
             </div>
-            <div className="trio">
-              <div className="mini">
-                <h4>交期<em>准时率 / 响应速度</em></h4>
-                <p>准时率低于 90% 降级，紧急单优先分配给 A 级供应商。</p>
+            <ul className="perf-notes">
+              {PERF_ROWS.map((r) => (
+                <li key={r.name}><b>{r.name}</b>{r.note}</li>
+              ))}
+            </ul>
+
+            <div className="panel-head" style={{ marginTop: 16 }}>
+              <h3>全链路动态评估</h3>
+              <span className="ai-inline">AI 调用 · 换算与回写</span>
+            </div>
+            <div className="perf-chain">
+              {PERF_CHAIN.map((c) => (
+                <div className={`perf-chain-item${c.ai ? " ai" : ""}`} key={c.step}>
+                  {c.ai && <em className="ai-badge">AI</em>}
+                  <div className="perf-chain-step">{c.step}</div>
+                  <b>{c.title}</b>
+                  <span>{c.metric}</span>
+                  <p>{c.tip}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="panel-head" style={{ marginTop: 16 }}>
+              <h3>数据来源与换算</h3>
+              <span className="ai-inline">AI 调用 · 模型建议接入字段</span>
+            </div>
+            <div className="source-grid">
+              {PERF_SCORE_SOURCES.map((block) => (
+                <div className={`source-card${block.ai ? " ai" : ""}`} key={block.key}>
+                  <div className="source-card-head">
+                    <h4>{block.title}</h4>
+                    <span className="chip">{block.weight}</span>
+                    {block.ai && <span className="ai-badge">AI 调用</span>}
+                  </div>
+                  <p className="source-desc">{block.desc}</p>
+                  <div className="source-map">{block.map}</div>
+                  <div className="source-label">
+                    {block.raw === "准时率" || block.raw === "质量合格率"
+                      ? `${block.raw} 数据来源`
+                      : "模型建议数据来源"}
+                  </div>
+                  <ul className="source-list">
+                    {block.sources.map((s) => (
+                      <li key={s.system}>
+                        <b>{s.system}</b>
+                        <span>{s.field}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+
+            <div className="check-card">
+              <div className="panel-head">
+                <h3>完整性检查</h3>
+                <span>本页样本已闭合，实时接口未接入</span>
               </div>
-              <div className="mini">
-                <h4>质量<em>验收通过率 / 退换货</em></h4>
-                <p>质量合格率与退换货次数直接进入下次推荐排序。</p>
-              </div>
-              <div className="mini">
-                <h4>商务<em>价格波动 / 账期配合</em></h4>
-                <p>价格异常波动或账期不配合会限制协议续签。</p>
-              </div>
+              <ul className="check-list">
+                <li>五维均为 0–100 分，准时率、质量合格率保留为换算原值。</li>
+                <li>权重 25% + 25% + 15% + 20% + 15% = 100%，综合分可回溯。</li>
+                <li>等级与策略由综合分和交期阈值共同决定，与表格一致。</li>
+                <li>办公品类无在研项目时，研发分使用协作基线，避免和电机项目混评。</li>
+                <li>演示分数为回放样本，尚未连接 WMS、IQC、PLM、工单等实时接口。</li>
+              </ul>
             </div>
           </>
         )}

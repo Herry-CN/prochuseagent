@@ -262,28 +262,159 @@ export const CERT_ROWS = [
   },
 ];
 
+/** 五维权重合计 100%。综合分 = 交期×25% + 质量×25% + 成本×15% + 研发×20% + 售后×15% */
+export const PERF_WEIGHTS = { ontime: 0.25, quality: 0.25, cost: 0.15, rd: 0.2, afterSales: 0.15 };
+
 export const PERF_ROWS = [
   {
     name: "华东工业备件",
-    ontime: "96%",
-    quality: "98%",
+    category: "工控电机",
+    ontimeRaw: "96%",
+    qualityRaw: "98%",
+    ontime: 96,
+    quality: 98,
+    cost: 94,
+    rd: 95,
+    afterSales: 93,
+    total: 96,
     grade: "A",
     strategy: "优先使用",
+    note: "研发物料主供，五维均按本周期实绩计分。",
   },
   {
     name: "一站式办公仓",
-    ontime: "94%",
-    quality: "96%",
+    category: "办公用品",
+    ontimeRaw: "94%",
+    qualityRaw: "96%",
+    ontime: 94,
+    quality: 96,
+    cost: 91,
+    rd: 78,
+    afterSales: 90,
+    total: 90,
     grade: "A-",
     strategy: "协议续签",
+    note: "办公品类本周期无在研项目，研发分取品类协作基线，不按电机项目同权放大。",
   },
   {
     name: "长三角工控",
-    ontime: "89%",
-    quality: "91%",
+    category: "工控电机",
+    ontimeRaw: "89%",
+    qualityRaw: "91%",
+    ontime: 89,
+    quality: 91,
+    cost: 88,
+    rd: 82,
+    afterSales: 80,
+    total: 87,
     grade: "B",
     strategy: "限制紧急单",
+    note: "交期分 89 低于 90 阈值，综合分 87 落在 B 档，紧急单降权。",
   },
+];
+
+export const PERF_SCORE_SOURCES = [
+  {
+    key: "ontime",
+    title: "交期打分",
+    raw: "准时率",
+    weight: "权重 25%",
+    ai: true,
+    desc: "准时率线性映射为 0–100 分。交期分低于 90 触发紧急单限制。",
+    map: "交期分 = 准时率 × 100",
+    sources: [
+      { system: "采购订单 / SRM", field: "承诺交期、PO 要求到货日" },
+      { system: "WMS 到货签收", field: "实际签收时间、逾期天数" },
+      { system: "TMS 物流轨迹", field: "发运节点、在途延误" },
+      { system: "催货协同记录", field: "响应时长、改期次数" },
+    ],
+  },
+  {
+    key: "quality",
+    title: "质量打分",
+    raw: "质量合格率",
+    weight: "权重 25%",
+    ai: true,
+    desc: "质量合格率线性映射为 0–100 分，退换货与让步接收会下修分数。",
+    map: "质量分 = 合格率 × 100 − 退换货扣分",
+    sources: [
+      { system: "IQC 来料检验", field: "抽检合格批次 / 送检批次" },
+      { system: "到货验收单", field: "验收通过数量 / 收货数量" },
+      { system: "退换货单", field: "退货率、让步接收次数" },
+      { system: "QMS 不合格品", field: "缺陷等级、重复发生" },
+    ],
+  },
+  {
+    key: "cost",
+    title: "成本打分",
+    raw: "价格偏离",
+    weight: "权重 15%",
+    ai: true,
+    desc: "对照协议价与同期询价中位价，偏离越大分数越低。",
+    map: "成本分 = 100 − 价格偏离惩罚 − 账期不配合扣分",
+    sources: [
+      { system: "询比价单", field: "报价、中标价、历史协议价" },
+      { system: "PO / 发票", field: "成交单价、价差、税率" },
+      { system: "主数据价格库", field: "品类基准价、波动区间" },
+    ],
+  },
+  {
+    key: "rd",
+    title: "研发项目打分",
+    raw: "项目协同",
+    weight: "权重 20%",
+    ai: true,
+    desc: "覆盖试制、联调、验收到项目复盘。无在研项目时取品类协作基线。",
+    map: "研发分 = 里程碑、样品符合率、问题闭环、协同时效加权",
+    sources: [
+      { system: "PLM / 项目管理", field: "里程碑按时完成率、变更次数" },
+      { system: "样品测试台账", field: "技术参数符合率、复测通过率" },
+      { system: "验收与问题单", field: "缺陷密度、闭环时长" },
+      { system: "研发协同记录", field: "技术答疑响应时效、联调配合度" },
+    ],
+  },
+  {
+    key: "afterSales",
+    title: "售后打分",
+    raw: "服务履约",
+    weight: "权重 15%",
+    ai: true,
+    desc: "覆盖安装调试、保修响应、退换货到回访。",
+    map: "售后分 = SLA 达成、一次解决率、满意度、质保故障率加权",
+    sources: [
+      { system: "售后工单系统", field: "首响时长、SLA 达成率" },
+      { system: "退换货 / 索赔单", field: "闭环时长、一次解决率" },
+      { system: "CRM 回访", field: "现场支持满意度、复购意愿" },
+      { system: "质保履约日志", field: "保修期内故障率、备件到位时长" },
+    ],
+  },
+];
+
+export const PERF_AI_CALLS = [
+  {
+    id: "score",
+    title: "指标换算",
+    text: "读取准时率、质量合格率及成本、研发、售后原始字段，按评分模型换成 0–100 分。",
+  },
+  {
+    id: "grade",
+    title: "综合评级",
+    text: "按 25/25/15/20/15 加权得到综合分，映射等级：≥95 为 A，90–94 为 A-，80–89 为 B。",
+  },
+  {
+    id: "strategy",
+    title: "策略回写",
+    text: "交期分低于 90 或综合分低于 90 时限制紧急单，并把等级写回下次寻源排序。",
+  },
+];
+
+export const PERF_CHAIN = [
+  { step: "01", title: "交期", metric: "准时率 → 交期分", tip: "签收与物流回写后由 AI 换算", ai: true },
+  { step: "02", title: "质量", metric: "合格率 → 质量分", tip: "检验与退换货回写后由 AI 换算", ai: true },
+  { step: "03", title: "成本", metric: "价差 → 成本分", tip: "询价与 PO 回写后由 AI 换算", ai: true },
+  { step: "04", title: "研发项目", metric: "协同 → 研发分", tip: "PLM 与测试回写后由 AI 换算", ai: true },
+  { step: "05", title: "售后", metric: "SLA → 售后分", tip: "工单与回访回写后由 AI 换算", ai: true },
+  { step: "06", title: "等级回写", metric: "综合分 → 策略", tip: "AI 输出等级并影响推荐排序", ai: true },
 ];
 
 export const PORTFOLIO_ROWS = [
