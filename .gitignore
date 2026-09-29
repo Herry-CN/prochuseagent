@@ -5,3 +5,4 @@ _shots
 *.local
 .DS_Store
 .vercel
+.env*
