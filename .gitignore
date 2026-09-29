@@ -4,3 +4,4 @@ _frames
 _shots
 *.local
 .DS_Store
+.vercel
