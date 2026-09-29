@@ -387,7 +387,7 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
 
             <div className="panel-head" style={{ marginTop: 16 }}>
               <h3>数据来源与换算</h3>
-              <span className="ai-inline">AI 调用 · 模型建议接入字段</span>
+              <span className="ai-inline">相对传统评估 · AI 能力拆入各打分项</span>
             </div>
             <div className="source-grid">
               {PERF_SCORE_SOURCES.map((block) => (
@@ -397,8 +397,22 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
                     <span className="chip">{block.weight}</span>
                     {block.ai && <span className="ai-badge">AI 调用</span>}
                   </div>
+                  <div className="cap-row">
+                    {block.caps.map((c) => (
+                      <span className="cap-tag" key={c}>{c}</span>
+                    ))}
+                  </div>
                   <p className="source-desc">{block.desc}</p>
                   <div className="source-map">{block.map}</div>
+                  <div className="diff-box">
+                    <div className="diff-trad">{block.traditional}</div>
+                    <div className="diff-ai">{block.aiDiff}</div>
+                  </div>
+                  <div className="metric-row">
+                    {block.metrics.map((m) => (
+                      <span className="metric-chip" key={m}>{m}</span>
+                    ))}
+                  </div>
                   <div className="source-label">
                     {block.raw === "准时率" || block.raw === "质量合格率"
                       ? `${block.raw} 数据来源`
@@ -419,14 +433,14 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
             <div className="check-card">
               <div className="panel-head">
                 <h3>完整性检查</h3>
-                <span>本页样本已闭合，实时接口未接入</span>
+                <span>相对传统绩效评估的差异已拆入各打分项</span>
               </div>
               <ul className="check-list">
-                <li>五维均为 0–100 分，准时率、质量合格率保留为换算原值。</li>
-                <li>权重 25% + 25% + 15% + 20% + 15% = 100%，综合分可回溯。</li>
-                <li>等级与策略由综合分和交期阈值共同决定，与表格一致。</li>
-                <li>办公品类无在研项目时，研发分使用协作基线，避免和电机项目混评。</li>
-                <li>演示分数为回放样本，尚未连接 WMS、IQC、PLM、工单等实时接口。</li>
+                <li>五维均为 0–100 分；合规与韧性作为等级修正，不挤占五维权重。</li>
+                <li>NLP → 交期催货、成本合同、研发邮件/巡检、售后工单/客服。</li>
+                <li>OCR / 图像 → 交期货运单据、质量质检照片、研发/合规资质证书。</li>
+                <li>外部公开数据 → 成本行业波动、合规司法/处罚/舆情与供应链韧性。</li>
+                <li>量化指标已落到各打分项：平均回复时长、投诉闭环率、图像异常、资质过期等。</li>
               </ul>
             </div>
           </>

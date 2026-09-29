@@ -6,6 +6,7 @@ import {
   IconBox,
   IconCart,
   IconList,
+  IconRisk,
   IconSearch,
   IconSpark,
   IconUsers,
@@ -13,10 +14,11 @@ import {
 
 const NAV: { key: NavKey; view: ViewKey; icon: ReactNode }[] = [
   { key: "助手", view: "home", icon: <IconSpark /> },
-  { key: "品类", view: "category", icon: <IconList /> },
   { key: "需求", view: "demand", icon: <IconBox /> },
+  { key: "品类", view: "category", icon: <IconList /> },
   { key: "供应商", view: "srm", icon: <IconUsers /> },
   { key: "采购", view: "purchase", icon: <IconCart /> },
+  { key: "风险", view: "risk", icon: <IconRisk /> },
   { key: "看板", view: "board", icon: <IconBoard /> },
 ];
 

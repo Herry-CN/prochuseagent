@@ -1,4 +1,4 @@
-export type NavKey = "助手" | "品类" | "需求" | "供应商" | "采购" | "看板";
+export type NavKey = "助手" | "需求" | "品类" | "供应商" | "采购" | "风险" | "看板";
 export type ViewKey =
   | "home"
   | "chat"
@@ -7,13 +7,28 @@ export type ViewKey =
   | "srm"
   | "purchase"
   | "board"
-  | "case";
+  | "case"
+  | "risk";
 export type SrmTab = "寻源任务" | "供应商认证" | "绩效评价" | "供应商组合";
 
 export const DEFAULT_PROMPT =
   "我们研发二部下周要做底盘防水测试，急需买几台测试电机，预算没卡死。";
 
 export const HISTORY = [
+  {
+    id: "h0",
+    title: "日本IC工厂地震 · 断供风险",
+    meta: "风险情报",
+    time: "今天 09:18",
+    view: "risk" as ViewKey,
+  },
+  {
+    id: "h0",
+    title: "日本 IC 工厂地震风险穿透",
+    meta: "风险情报",
+    time: "今天 09:18",
+    view: "risk" as ViewKey,
+  },
   {
     id: "h1",
     title: "我们办公室需要采购一批…",
@@ -104,6 +119,7 @@ export const DEMO_CARDS = [
   { id: "08", title: "履约三单匹配", desc: "收货、发票、付款联动" },
   { id: "09", title: "绩效反馈", desc: "履约结果影响下次推荐" },
   { id: "10", title: "一键跑主案例", desc: "研发测试电机采购演示" },
+  { id: "11", title: "风险情报决策", desc: "全球风险穿透到采购行动" },
 ];
 
 export const PAPER_CHAT = [
@@ -320,13 +336,17 @@ export const PERF_SCORE_SOURCES = [
     raw: "准时率",
     weight: "权重 25%",
     ai: true,
+    caps: ["NLP", "OCR"],
     desc: "准时率线性映射为 0–100 分。交期分低于 90 触发紧急单限制。",
-    map: "交期分 = 准时率 × 100",
+    map: "交期分 = 准时率 × 100 − 改期 / 在途异常扣分",
+    traditional: "传统：仅看 PO 承诺日与签收日是否逾期，靠人工催货记录。",
+    aiDiff: "AI：NLP 解析催货邮件与改期沟通，OCR 识别物流单据；自动量化响应速度与在途异常。",
+    metrics: ["平均回复时长", "改期次数", "在途延误识别率"],
     sources: [
       { system: "采购订单 / SRM", field: "承诺交期、PO 要求到货日" },
       { system: "WMS 到货签收", field: "实际签收时间、逾期天数" },
-      { system: "TMS 物流轨迹", field: "发运节点、在途延误" },
-      { system: "催货协同记录", field: "响应时长、改期次数" },
+      { system: "TMS 物流单据 OCR", field: "发运单号、节点时间、异常章戳" },
+      { system: "催货邮件 NLP", field: "平均回复时长、改期承诺兑现率" },
     ],
   },
   {
@@ -335,13 +355,17 @@ export const PERF_SCORE_SOURCES = [
     raw: "质量合格率",
     weight: "权重 25%",
     ai: true,
-    desc: "质量合格率线性映射为 0–100 分，退换货与让步接收会下修分数。",
-    map: "质量分 = 合格率 × 100 − 退换货扣分",
+    caps: ["OCR", "图像识别"],
+    desc: "质量合格率线性映射为 0–100 分，质检异常与退换货会下修分数。",
+    map: "质量分 = 合格率 × 100 − 图像异常扣分 − 退换货扣分",
+    traditional: "传统：依赖 IQC 录入合格率与退换货台账，照片靠人工翻看。",
+    aiDiff: "AI：OCR / 图像识别对接质检照片与物流单据，自动发现外观缺陷、缺件与单据不一致。",
+    metrics: ["图像异常检出数", "单据一致性", "退换货闭环率"],
     sources: [
       { system: "IQC 来料检验", field: "抽检合格批次 / 送检批次" },
-      { system: "到货验收单", field: "验收通过数量 / 收货数量" },
+      { system: "质检照片 图像识别", field: "外观缺陷、缺件、铭牌参数" },
+      { system: "物流 / 验收单据 OCR", field: "品名数量与 PO 一致性" },
       { system: "退换货单", field: "退货率、让步接收次数" },
-      { system: "QMS 不合格品", field: "缺陷等级、重复发生" },
     ],
   },
   {
@@ -350,12 +374,16 @@ export const PERF_SCORE_SOURCES = [
     raw: "价格偏离",
     weight: "权重 15%",
     ai: true,
-    desc: "对照协议价与同期询价中位价，偏离越大分数越低。",
-    map: "成本分 = 100 − 价格偏离惩罚 − 账期不配合扣分",
+    caps: ["NLP", "外部数据"],
+    desc: "对照协议价与同期询价中位价，并结合行业波动修正。",
+    map: "成本分 = 100 − 价格偏离 − 账期不配合 − 行业波动惩罚",
+    traditional: "传统：人工比价与协议价核对，很少纳入外部市场波动。",
+    aiDiff: "AI：NLP 抽取合同价格条款与账期；对接行业公开行情，把供应链价格韧性纳入评分。",
+    metrics: ["协议价偏离度", "账期配合度", "行业波动敏感度"],
     sources: [
-      { system: "询比价单", field: "报价、中标价、历史协议价" },
-      { system: "PO / 发票", field: "成交单价、价差、税率" },
-      { system: "主数据价格库", field: "品类基准价、波动区间" },
+      { system: "合同文本 NLP", field: "单价、阶梯价、账期、违约金条款" },
+      { system: "询比价单 / PO", field: "报价、成交价、历史协议价" },
+      { system: "行业公开行情", field: "品类价格指数、波动区间" },
     ],
   },
   {
@@ -364,13 +392,17 @@ export const PERF_SCORE_SOURCES = [
     raw: "项目协同",
     weight: "权重 20%",
     ai: true,
+    caps: ["NLP", "OCR"],
     desc: "覆盖试制、联调、验收到项目复盘。无在研项目时取品类协作基线。",
-    map: "研发分 = 里程碑、样品符合率、问题闭环、协同时效加权",
+    map: "研发分 = 里程碑、样品符合率、问题闭环、沟通配合度加权",
+    traditional: "传统：依赖项目经理主观评价与零散会议纪要。",
+    aiDiff: "AI：NLP 解析邮件沟通与巡检报告，将沟通配合度、问题解决能力转为平均回复时长与闭环率。",
+    metrics: ["沟通配合度", "问题解决能力", "巡检问题闭环率"],
     sources: [
       { system: "PLM / 项目管理", field: "里程碑按时完成率、变更次数" },
-      { system: "样品测试台账", field: "技术参数符合率、复测通过率" },
-      { system: "验收与问题单", field: "缺陷密度、闭环时长" },
-      { system: "研发协同记录", field: "技术答疑响应时效、联调配合度" },
+      { system: "邮件沟通 NLP", field: "平均回复时长、技术答疑配合度" },
+      { system: "巡检报告 NLP", field: "问题条目、整改闭环率" },
+      { system: "样品 / 资质证书 OCR", field: "参数符合率、证书有效期" },
     ],
   },
   {
@@ -379,42 +411,64 @@ export const PERF_SCORE_SOURCES = [
     raw: "服务履约",
     weight: "权重 15%",
     ai: true,
+    caps: ["NLP"],
     desc: "覆盖安装调试、保修响应、退换货到回访。",
-    map: "售后分 = SLA 达成、一次解决率、满意度、质保故障率加权",
+    map: "售后分 = 服务响应速度 + 问题解决能力 + 沟通配合度",
+    traditional: "传统：靠工单完成数与人工满意度问卷，难量化沟通过程。",
+    aiDiff: "AI：NLP 自动解析工单投诉与客服记录，将服务响应速度、问题解决能力、沟通配合度转为平均回复时长、投诉闭环率。",
+    metrics: ["平均回复时长", "投诉闭环率", "一次解决率"],
     sources: [
-      { system: "售后工单系统", field: "首响时长、SLA 达成率" },
+      { system: "工单投诉 NLP", field: "平均回复时长、投诉闭环率" },
+      { system: "客服记录 NLP", field: "沟通配合度、情绪与升级次数" },
       { system: "退换货 / 索赔单", field: "闭环时长、一次解决率" },
       { system: "CRM 回访", field: "现场支持满意度、复购意愿" },
-      { system: "质保履约日志", field: "保修期内故障率、备件到位时长" },
+    ],
+  },
+  {
+    key: "compliance",
+    title: "合规与韧性（并入等级）",
+    raw: "外部风险",
+    weight: "等级修正",
+    ai: true,
+    caps: ["OCR", "外部数据"],
+    desc: "不单独占五维权重，发现高风险时下调等级或限制推荐。",
+    map: "等级修正 = 资质有效性 − 涉诉 / 处罚 / 舆情风险",
+    traditional: "传统：年度人工尽调，难以及时感知司法、处罚与舆情变化。",
+    aiDiff: "AI：OCR 识别资质证书过期；对接司法涉诉、行政处罚、环保舆情与行业波动，将合规风险与供应链韧性纳入评价。",
+    metrics: ["资质过期告警", "涉诉 / 处罚命中", "舆情风险等级"],
+    sources: [
+      { system: "资质证书 OCR", field: "营业执照、ISO、授权有效期" },
+      { system: "司法 / 行政处罚公开数据", field: "涉诉、失信、处罚记录" },
+      { system: "环保与行业舆情", field: "负面舆情、供给中断风险" },
     ],
   },
 ];
 
 export const PERF_AI_CALLS = [
   {
-    id: "score",
-    title: "指标换算",
-    text: "读取准时率、质量合格率及成本、研发、售后原始字段，按评分模型换成 0–100 分。",
+    id: "nlp",
+    title: "NLP 文本解析",
+    text: "解析合同、邮件、工单投诉、巡检报告、客服记录，输出平均回复时长、投诉闭环率、沟通配合度。",
   },
   {
-    id: "grade",
-    title: "综合评级",
-    text: "按 25/25/15/20/15 加权得到综合分，映射等级：≥95 为 A，90–94 为 A-，80–89 为 B。",
+    id: "ocr",
+    title: "OCR / 图像识别",
+    text: "识别质检照片、物流单据、资质证书，自动标记质量异常、单据不一致与资质过期。",
   },
   {
-    id: "strategy",
-    title: "策略回写",
-    text: "交期分低于 90 或综合分低于 90 时限制紧急单，并把等级写回下次寻源排序。",
+    id: "external",
+    title: "外部风险接入",
+    text: "对接司法涉诉、行政处罚、环保舆情与行业波动，修正成本分与综合等级。",
   },
 ];
 
 export const PERF_CHAIN = [
-  { step: "01", title: "交期", metric: "准时率 → 交期分", tip: "签收与物流回写后由 AI 换算", ai: true },
-  { step: "02", title: "质量", metric: "合格率 → 质量分", tip: "检验与退换货回写后由 AI 换算", ai: true },
-  { step: "03", title: "成本", metric: "价差 → 成本分", tip: "询价与 PO 回写后由 AI 换算", ai: true },
-  { step: "04", title: "研发项目", metric: "协同 → 研发分", tip: "PLM 与测试回写后由 AI 换算", ai: true },
-  { step: "05", title: "售后", metric: "SLA → 售后分", tip: "工单与回访回写后由 AI 换算", ai: true },
-  { step: "06", title: "等级回写", metric: "综合分 → 策略", tip: "AI 输出等级并影响推荐排序", ai: true },
+  { step: "01", title: "交期", metric: "签收 + 物流 OCR + 邮件 NLP", tip: "传统只看逾期；AI 量化响应与在途异常", ai: true },
+  { step: "02", title: "质量", metric: "合格率 + 质检图像识别", tip: "传统靠人工看片；AI 自动检出异常", ai: true },
+  { step: "03", title: "成本", metric: "合同 NLP + 行业行情", tip: "传统人工比价；AI 纳入波动韧性", ai: true },
+  { step: "04", title: "研发项目", metric: "邮件 / 巡检 NLP", tip: "传统主观评价；AI 量化配合度", ai: true },
+  { step: "05", title: "售后", metric: "工单 / 客服 NLP", tip: "传统问卷打分；AI 量化闭环率", ai: true },
+  { step: "06", title: "合规韧性", metric: "证书 OCR + 外部公开数据", tip: "传统年度尽调；AI 持续风险修正", ai: true },
 ];
 
 export const PORTFOLIO_ROWS = [
@@ -662,6 +716,10 @@ export const TOASTS: Record<string, { title: string; desc: string }> = {
   "10": {
     title: "AI匹配完成",
     desc: "已识别采购对象并召回合格供应商库，正在生成推荐结果。",
+  },
+  "11": {
+    title: "风险情报 Agent",
+    desc: "感知全球风险，映射企业供应链，并生成可执行采购决策。",
   },
   list: {
     title: "采购清单已生成",

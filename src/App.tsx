@@ -5,6 +5,7 @@ import { Home } from "./components/Home";
 import { Ring } from "./components/Icons";
 import { Layout } from "./components/Layout";
 import { Board, Category, Demand, Purchase, SRM } from "./components/Pages";
+import { RiskPage } from "./components/RiskPage";
 import {
   DEFAULT_PROMPT,
   HISTORY,
@@ -25,6 +26,7 @@ const CRUMBS: Record<ViewKey, string[]> = {
   purchase: ["采购执行"],
   board: ["采购看板"],
   case: ["采购需求", "研发测试电机采购"],
+  risk: ["采购风险情报与决策"],
 };
 
 const NAV_FROM_VIEW: Record<ViewKey, NavKey> = {
@@ -36,6 +38,7 @@ const NAV_FROM_VIEW: Record<ViewKey, NavKey> = {
   srm: "供应商",
   purchase: "采购",
   board: "看板",
+  risk: "风险",
 };
 
 function viewFromHash(): ViewKey {
@@ -47,7 +50,9 @@ export default function App() {
   const initial = viewFromHash();
   const [view, setView] = useState<ViewKey>(initial);
   const [nav, setNav] = useState<NavKey>(NAV_FROM_VIEW[initial]);
-  const [historyId, setHistoryId] = useState(initial === "case" ? "h5" : "h1");
+  const [historyId, setHistoryId] = useState(
+    initial === "case" ? "h5" : initial === "risk" ? "h0" : "h1"
+  );
   const [search, setSearch] = useState("");
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
   const [srmTab, setSrmTab] = useState<SrmTab>("寻源任务");
@@ -153,6 +158,10 @@ export default function App() {
       go("srm", "供应商");
     }
     if (id === "10") runCase();
+    if (id === "11") {
+      showToast(TOASTS["11"].title, TOASTS["11"].desc);
+      go("risk", "风险");
+    }
   };
 
   const onQuick = (key: string) => {
@@ -211,6 +220,7 @@ export default function App() {
     if (view === "srm") return <SRM tab={srmTab} onTab={setSrmTab} />;
     if (view === "purchase") return <Purchase highlight={purchaseHi} />;
     if (view === "board") return <Board />;
+    if (view === "risk") return <RiskPage onToast={showToast} />;
     return (
       <CasePage
         onToast={showToast}
@@ -239,6 +249,7 @@ export default function App() {
         setCustomChat(null);
         setGenericTitle(item?.title || "");
         if (v === "case") go("case", "助手", id);
+        else if (v === "risk") go("risk", "风险", id);
         else if (id === "h1") go("chat", "助手", id);
         else {
           setView("chat");
