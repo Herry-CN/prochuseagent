@@ -17,14 +17,7 @@ export const DEFAULT_PROMPT =
 export const HISTORY = [
   {
     id: "h0",
-    title: "日本IC工厂地震 · 断供风险",
-    meta: "风险情报",
-    time: "今天 09:18",
-    view: "risk" as ViewKey,
-  },
-  {
-    id: "h0",
-    title: "日本 IC 工厂地震风险穿透",
+    title: "台湾花莲地震 · PHY 断供风险",
     meta: "风险情报",
     time: "今天 09:18",
     view: "risk" as ViewKey,
@@ -281,7 +274,108 @@ export const CERT_ROWS = [
 /** 五维权重合计 100%。综合分 = 交期×25% + 质量×25% + 成本×15% + 研发×20% + 售后×15% */
 export const PERF_WEIGHTS = { ontime: 0.25, quality: 0.25, cost: 0.15, rd: 0.2, afterSales: 0.15 };
 
-export const PERF_ROWS = [
+export type PerfGrade = "A" | "B" | "C" | "D";
+
+/** 绩效分级规则：分数直接对应管理动作（示例规则，需写入制度后强制执行） */
+export const PERF_GRADE_RULES: Record<
+  PerfGrade,
+  {
+    label: string;
+    range: string;
+    share: string;
+    treatment: string;
+    improve: string;
+    strategy: string;
+    actions: { who: string; text: string }[];
+  }
+> = {
+  A: {
+    label: "卓越",
+    range: "≥ 90 分",
+    share: "份额上调；优先获取新业务提名（推荐比例建议 ≤ 20%）",
+    treatment: "优先付款档；联合创新；可参与年度优秀供应商评选",
+    improve: "保持优势，输出最佳实践",
+    strategy: "份额上调 · 优先新业务",
+    actions: [
+      { who: "品类经理", text: "发起份额上调申请，并评估新项目优先提名资格。" },
+      { who: "财务 / 应付", text: "将该供应商纳入优先付款档，更新付款策略。" },
+      { who: "研发 / 采购", text: "启动联合创新议题，沉淀可复制最佳实践。" },
+      { who: "SRM 运营", text: "加入年度优秀供应商候选池。" },
+    ],
+  },
+  B: {
+    label: "良好",
+    range: "80 – 89 分",
+    share: "份额维持不变",
+    treatment: "正常合作条款与账期",
+    improve: "针对弱项制定自改进计划",
+    strategy: "份额维持 · 弱项自改进",
+    actions: [
+      { who: "品类经理", text: "确认本周期份额维持，不额外倾斜新业务。" },
+      { who: "SQE / 采购", text: "针对最低分维度输出自改进计划与跟进节点。" },
+      { who: "供应商接口人", text: "确认改进计划回执，纳入下月绩效复核。" },
+      { who: "SRM 运营", text: "标记为供应主力池，持续监测交期与质量波动。" },
+    ],
+  },
+  C: {
+    label: "待改进",
+    range: "70 – 79 分",
+    share: "份额下调 10%～30%（示例规则）",
+    treatment: "限制承接新业务、新项目",
+    improve: "90 天限期整改；SQE 驻场 / 辅导",
+    strategy: "份额下调 · 90 天整改",
+    actions: [
+      { who: "品类经理", text: "按规则下调份额 10%～30%，同步备份供应商承接转移量。" },
+      { who: "寻源 / 组合", text: "限制新业务与新项目提名，更新供应商组合策略。" },
+      { who: "SQE", text: "启动 90 天限期整改，制定驻场辅导计划与周报。" },
+      { who: "采购经理", text: "约谈供应商管理层，签署整改承诺书。" },
+    ],
+  },
+  D: {
+    label: "不合格",
+    range: "< 70 分",
+    share: "冻结现有份额；启动替代资源",
+    treatment: "冻结全部新业务；高层约谈",
+    improve: "6 个月观察期；不达标退出",
+    strategy: "冻结份额 · 启动替代",
+    actions: [
+      { who: "品类经理", text: "立即冻结现有份额增量，启动替代供应商导入。" },
+      { who: "寻源任务", text: "创建 / 加速替代资源寻源与认证。" },
+      { who: "高层 / 采购总监", text: "组织高层约谈，明确 6 个月观察与退出条件。" },
+      { who: "合规 / SRM", text: "冻结新业务权限，观察期满未达标则启动退出流程。" },
+    ],
+  },
+};
+
+export function derivePerfGrade(total: number): PerfGrade {
+  if (total >= 90) return "A";
+  if (total >= 80) return "B";
+  if (total >= 70) return "C";
+  return "D";
+}
+
+export function gradeTone(grade: PerfGrade): "ok" | "info" | "warn" | "bad" {
+  if (grade === "A") return "ok";
+  if (grade === "B") return "info";
+  if (grade === "C") return "warn";
+  return "bad";
+}
+
+type PerfRowBase = {
+  name: string;
+  category: string;
+  ontimeRaw: string;
+  qualityRaw: string;
+  ontime: number;
+  quality: number;
+  cost: number;
+  rd: number;
+  afterSales: number;
+  total: number;
+  note: string;
+};
+
+const PERF_ROW_BASE: PerfRowBase[] = [
   {
     name: "华东工业备件",
     category: "工控电机",
@@ -293,9 +387,7 @@ export const PERF_ROWS = [
     rd: 95,
     afterSales: 93,
     total: 96,
-    grade: "A",
-    strategy: "优先使用",
-    note: "研发物料主供，五维均按本周期实绩计分。",
+    note: "A 档卓越供应商：五维均衡，可作为品类标杆输出最佳实践。",
   },
   {
     name: "一站式办公仓",
@@ -307,10 +399,8 @@ export const PERF_ROWS = [
     cost: 91,
     rd: 78,
     afterSales: 90,
-    total: 90,
-    grade: "A-",
-    strategy: "协议续签",
-    note: "办公品类本周期无在研项目，研发分取品类协作基线，不按电机项目同权放大。",
+    total: 91,
+    note: "A 档：办公品类无在研项目，研发分取协作基线；综合分 ≥90 触发份额上调与优先付款。",
   },
   {
     name: "长三角工控",
@@ -323,11 +413,89 @@ export const PERF_ROWS = [
     rd: 82,
     afterSales: 80,
     total: 87,
-    grade: "B",
-    strategy: "限制紧急单",
-    note: "交期分 89 低于 90 阈值，综合分 87 落在 B 档，紧急单降权。",
+    note: "B 档供应主力：交期偏弱，份额维持，需针对交期制定自改进计划。",
+  },
+  {
+    name: "华南连接器",
+    category: "精密连接器",
+    ontimeRaw: "86%",
+    qualityRaw: "88%",
+    ontime: 86,
+    quality: 88,
+    cost: 84,
+    rd: 80,
+    afterSales: 83,
+    total: 85,
+    note: "B 档：质量与交期尚可，成本议价一般，保持正常合作并跟进弱项改进。",
+  },
+  {
+    name: "中原钣金配套",
+    category: "结构件",
+    ontimeRaw: "78%",
+    qualityRaw: "80%",
+    ontime: 78,
+    quality: 80,
+    cost: 76,
+    rd: 72,
+    afterSales: 74,
+    total: 76,
+    note: "C 档待改进：交期与研发协同不足，按规则下调份额并启动 90 天整改。",
+  },
+  {
+    name: "沿海线束厂",
+    category: "线束线缆",
+    ontimeRaw: "74%",
+    qualityRaw: "77%",
+    ontime: 74,
+    quality: 77,
+    cost: 79,
+    rd: 70,
+    afterSales: 71,
+    total: 74,
+    note: "C 档：质量波动与售后响应偏慢，限制新项目并安排 SQE 辅导。",
+  },
+  {
+    name: "北方铸造件",
+    category: "金属铸件",
+    ontimeRaw: "68%",
+    qualityRaw: "70%",
+    ontime: 68,
+    quality: 70,
+    cost: 72,
+    rd: 65,
+    afterSales: 66,
+    total: 68,
+    note: "D 档不合格：多项维度不达标，冻结份额并启动替代资源与高层约谈。",
+  },
+  {
+    name: "西南包装耗材",
+    category: "包装耗材",
+    ontimeRaw: "62%",
+    qualityRaw: "65%",
+    ontime: 62,
+    quality: 65,
+    cost: 70,
+    rd: 58,
+    afterSales: 60,
+    total: 63,
+    note: "D 档：交期与质量严重偏离，冻结新业务，观察期不达标则退出。",
   },
 ];
+
+export const PERF_ROWS = PERF_ROW_BASE.map((r) => {
+  const grade = derivePerfGrade(r.total);
+  const rule = PERF_GRADE_RULES[grade];
+  return {
+    ...r,
+    grade,
+    gradeLabel: rule.label,
+    strategy: rule.strategy,
+    share: rule.share,
+    treatment: rule.treatment,
+    improve: rule.improve,
+    actions: rule.actions,
+  };
+});
 
 export const PERF_SCORE_SOURCES = [
   {
@@ -343,10 +511,10 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：NLP 解析催货邮件与改期沟通，OCR 识别物流单据；自动量化响应速度与在途异常。",
     metrics: ["平均回复时长", "改期次数", "在途延误识别率"],
     sources: [
-      { system: "采购订单 / SRM", field: "承诺交期、PO 要求到货日" },
-      { system: "WMS 到货签收", field: "实际签收时间、逾期天数" },
-      { system: "TMS 物流单据 OCR", field: "发运单号、节点时间、异常章戳" },
-      { system: "催货邮件 NLP", field: "平均回复时长、改期承诺兑现率" },
+      { id: "ontime-po", system: "采购订单 / SRM", field: "承诺交期、PO 要求到货日", cap: "系统" },
+      { id: "ontime-wms", system: "WMS 到货签收", field: "实际签收时间、逾期天数", cap: "系统" },
+      { id: "ontime-tms", system: "TMS 物流单据 OCR", field: "发运单号、节点时间、异常章戳", cap: "OCR" },
+      { id: "ontime-mail", system: "催货邮件 NLP", field: "平均回复时长、改期承诺兑现率", cap: "NLP" },
     ],
   },
   {
@@ -362,10 +530,10 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：OCR / 图像识别对接质检照片与物流单据，自动发现外观缺陷、缺件与单据不一致。",
     metrics: ["图像异常检出数", "单据一致性", "退换货闭环率"],
     sources: [
-      { system: "IQC 来料检验", field: "抽检合格批次 / 送检批次" },
-      { system: "质检照片 图像识别", field: "外观缺陷、缺件、铭牌参数" },
-      { system: "物流 / 验收单据 OCR", field: "品名数量与 PO 一致性" },
-      { system: "退换货单", field: "退货率、让步接收次数" },
+      { id: "quality-iqc", system: "IQC 来料检验", field: "抽检合格批次 / 送检批次", cap: "系统" },
+      { id: "quality-vision", system: "质检照片 图像识别", field: "外观缺陷、缺件、铭牌参数", cap: "图像识别" },
+      { id: "quality-ocr", system: "物流 / 验收单据 OCR", field: "品名数量与 PO 一致性", cap: "OCR" },
+      { id: "quality-return", system: "退换货单", field: "退货率、让步接收次数", cap: "系统" },
     ],
   },
   {
@@ -381,9 +549,9 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：NLP 抽取合同价格条款与账期；对接行业公开行情，把供应链价格韧性纳入评分。",
     metrics: ["协议价偏离度", "账期配合度", "行业波动敏感度"],
     sources: [
-      { system: "合同文本 NLP", field: "单价、阶梯价、账期、违约金条款" },
-      { system: "询比价单 / PO", field: "报价、成交价、历史协议价" },
-      { system: "行业公开行情", field: "品类价格指数、波动区间" },
+      { id: "cost-contract", system: "合同文本 NLP", field: "单价、阶梯价、账期、违约金条款", cap: "NLP" },
+      { id: "cost-rfq", system: "询比价单 / PO", field: "报价、成交价、历史协议价", cap: "系统" },
+      { id: "cost-market", system: "行业公开行情", field: "品类价格指数、波动区间", cap: "外部数据" },
     ],
   },
   {
@@ -399,10 +567,10 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：NLP 解析邮件沟通与巡检报告，将沟通配合度、问题解决能力转为平均回复时长与闭环率。",
     metrics: ["沟通配合度", "问题解决能力", "巡检问题闭环率"],
     sources: [
-      { system: "PLM / 项目管理", field: "里程碑按时完成率、变更次数" },
-      { system: "邮件沟通 NLP", field: "平均回复时长、技术答疑配合度" },
-      { system: "巡检报告 NLP", field: "问题条目、整改闭环率" },
-      { system: "样品 / 资质证书 OCR", field: "参数符合率、证书有效期" },
+      { id: "rd-plm", system: "PLM / 项目管理", field: "里程碑按时完成率、变更次数", cap: "系统" },
+      { id: "rd-mail", system: "邮件沟通 NLP", field: "平均回复时长、技术答疑配合度", cap: "NLP" },
+      { id: "rd-inspect", system: "巡检报告 NLP", field: "问题条目、整改闭环率", cap: "NLP" },
+      { id: "rd-cert", system: "样品 / 资质证书 OCR", field: "参数符合率、证书有效期", cap: "OCR" },
     ],
   },
   {
@@ -418,10 +586,10 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：NLP 自动解析工单投诉与客服记录，将服务响应速度、问题解决能力、沟通配合度转为平均回复时长、投诉闭环率。",
     metrics: ["平均回复时长", "投诉闭环率", "一次解决率"],
     sources: [
-      { system: "工单投诉 NLP", field: "平均回复时长、投诉闭环率" },
-      { system: "客服记录 NLP", field: "沟通配合度、情绪与升级次数" },
-      { system: "退换货 / 索赔单", field: "闭环时长、一次解决率" },
-      { system: "CRM 回访", field: "现场支持满意度、复购意愿" },
+      { id: "as-ticket", system: "工单投诉 NLP", field: "平均回复时长、投诉闭环率", cap: "NLP" },
+      { id: "as-cs", system: "客服记录 NLP", field: "沟通配合度、情绪与升级次数", cap: "NLP" },
+      { id: "as-claim", system: "退换货 / 索赔单", field: "闭环时长、一次解决率", cap: "系统" },
+      { id: "as-crm", system: "CRM 回访", field: "现场支持满意度、复购意愿", cap: "系统" },
     ],
   },
   {
@@ -437,12 +605,491 @@ export const PERF_SCORE_SOURCES = [
     aiDiff: "AI：OCR 识别资质证书过期；对接司法涉诉、行政处罚、环保舆情与行业波动，将合规风险与供应链韧性纳入评价。",
     metrics: ["资质过期告警", "涉诉 / 处罚命中", "舆情风险等级"],
     sources: [
-      { system: "资质证书 OCR", field: "营业执照、ISO、授权有效期" },
-      { system: "司法 / 行政处罚公开数据", field: "涉诉、失信、处罚记录" },
-      { system: "环保与行业舆情", field: "负面舆情、供给中断风险" },
+      { id: "comp-cert", system: "资质证书 OCR", field: "营业执照、ISO、授权有效期", cap: "OCR" },
+      { id: "comp-legal", system: "司法 / 行政处罚公开数据", field: "涉诉、失信、处罚记录", cap: "外部数据" },
+      { id: "comp-news", system: "环保与行业舆情", field: "负面舆情、供给中断风险", cap: "外部数据" },
     ],
   },
 ];
+
+/** 数据来源下钻明细：演示 OCR / NLP / 图像识别等 AI 自动抽取 */
+export type PerfSourceDetail = {
+  id: string;
+  metricKey: string;
+  metricTitle: string;
+  system: string;
+  cap: string;
+  pipeline: string[];
+  summary: { label: string; value: string }[];
+  columns: string[];
+  rows: string[][];
+  note: string;
+};
+
+export const PERF_SOURCE_DETAILS: Record<string, PerfSourceDetail> = {
+  "ontime-po": {
+    id: "ontime-po",
+    metricKey: "ontime",
+    metricTitle: "交期打分",
+    system: "采购订单 / SRM",
+    cap: "系统",
+    pipeline: ["同步 PO 主数据", "抽取承诺交期 / 要求到货日", "对齐供应商批次", "写入交期评分底表"],
+    summary: [
+      { label: "关联 PO", value: "128 笔" },
+      { label: "承诺准时率", value: "94.2%" },
+      { label: "平均提前期", value: "18 天" },
+    ],
+    columns: ["PO 号", "供应商", "物料", "承诺交期", "要求到货日", "状态"],
+    rows: [
+      ["PO-2026-0312", "华东精密", "工控电机 M3", "2026-03-18", "2026-03-20", "已承诺"],
+      ["PO-2026-0298", "南方电机", "伺服驱动", "2026-03-12", "2026-03-15", "改期+2天"],
+      ["PO-2026-0281", "长三角工控", "编码器套件", "2026-03-08", "2026-03-10", "已承诺"],
+      ["PO-2026-0266", "华东精密", "轴承组件", "2026-03-05", "2026-03-06", "加急"],
+    ],
+    note: "交期打分底数来自 SRM 承诺交期与 PO 要求到货日的对齐结果。",
+  },
+  "ontime-wms": {
+    id: "ontime-wms",
+    metricKey: "ontime",
+    metricTitle: "交期打分",
+    system: "WMS 到货签收",
+    cap: "系统",
+    pipeline: ["接收到货过账", "比对承诺交期", "计算逾期天数", "回写准时率"],
+    summary: [
+      { label: "本周期签收", value: "96 单" },
+      { label: "准时签收", value: "90 单" },
+      { label: "平均逾期", value: "0.6 天" },
+    ],
+    columns: ["ASN", "供应商", "签收时间", "承诺交期", "逾期天", "结果"],
+    rows: [
+      ["ASN-88421", "华东精密", "2026-03-19 14:22", "2026-03-18", "+1", "轻微逾期"],
+      ["ASN-88390", "南方电机", "2026-03-15 09:10", "2026-03-15", "0", "准时"],
+      ["ASN-88355", "长三角工控", "2026-03-09 16:40", "2026-03-10", "-1", "提前"],
+      ["ASN-88312", "华北机电", "2026-03-07 11:05", "2026-03-05", "+2", "逾期"],
+    ],
+    note: "实际签收时间与承诺交期比对后，直接进入交期打分的准时率计算。",
+  },
+  "ontime-tms": {
+    id: "ontime-tms",
+    metricKey: "ontime",
+    metricTitle: "交期打分",
+    system: "TMS 物流单据 OCR",
+    cap: "OCR",
+    pipeline: ["采集运单影像", "OCR 识别单号与节点章戳", "抽取发运/中转/到港时间", "标记在途异常"],
+    summary: [
+      { label: "识别单据", value: "64 张" },
+      { label: "OCR 置信度", value: "96.8%" },
+      { label: "在途异常", value: "5 单" },
+    ],
+    columns: ["影像", "运单号", "OCR 节点时间", "异常章戳", "置信度", "评分影响"],
+    rows: [
+      ["运单_0318.jpg", "YT31289001", "发运 03-16 08:20", "无", "98%", "正常"],
+      ["运单_0315.jpg", "SF15882210", "中转延误章 03-14", "天气延误", "95%", "在途异常 -1"],
+      ["签收单_0312.png", "JD7745102", "签收 03-12 19:01", "无", "97%", "正常"],
+      ["运单_0308.jpg", "YT31277120", "到港 03-09 未盖章", "缺节点章", "91%", "人工复核"],
+    ],
+    note: "OCR 自动抽取物流节点，在途延误识别率计入交期打分扣分项。",
+  },
+  "ontime-mail": {
+    id: "ontime-mail",
+    metricKey: "ontime",
+    metricTitle: "交期打分",
+    system: "催货邮件 NLP",
+    cap: "NLP",
+    pipeline: ["抓取催货往来邮件", "NLP 识别意图与承诺日", "计算平均回复时长", "核对改期兑现率"],
+    summary: [
+      { label: "解析邮件", value: "214 封" },
+      { label: "平均回复", value: "3.2 小时" },
+      { label: "改期兑现率", value: "87%" },
+    ],
+    columns: ["邮件主题", "供应商", "NLP 意图", "回复时长", "改期承诺", "兑现"],
+    rows: [
+      ["RE: PO-0312 交期确认", "华东精密", "确认交期", "1.5h", "—", "—"],
+      ["RE: 伺服驱动加急", "南方电机", "申请改期", "4.0h", "03-17", "已兑现"],
+      ["RE: 编码器缺料", "长三角工控", "解释延误", "6.2h", "03-12", "未兑现"],
+      ["RE: 轴承发运通知", "华东精密", "发运告知", "0.8h", "—", "—"],
+    ],
+    note: "NLP 输出的平均回复时长与改期兑现率，直接映射到交期打分的沟通与异常扣分。",
+  },
+  "quality-iqc": {
+    id: "quality-iqc",
+    metricKey: "quality",
+    metricTitle: "质量打分",
+    system: "IQC 来料检验",
+    cap: "系统",
+    pipeline: ["接收送检批次", "记录抽检结果", "汇总合格率", "回写质量打分"],
+    summary: [
+      { label: "送检批次", value: "48" },
+      { label: "合格批次", value: "45" },
+      { label: "合格率", value: "93.8%" },
+    ],
+    columns: ["批次号", "供应商", "物料", "抽检数", "不合格", "结论"],
+    rows: [
+      ["LOT-260318A", "华东精密", "工控电机 M3", "20", "0", "合格"],
+      ["LOT-260315B", "南方电机", "伺服驱动", "16", "1", "让步接收"],
+      ["LOT-260312C", "长三角工控", "编码器", "12", "2", "不合格"],
+      ["LOT-260308D", "华北机电", "联轴器", "10", "0", "合格"],
+    ],
+    note: "质量合格率是质量打分的主映射输入。",
+  },
+  "quality-vision": {
+    id: "quality-vision",
+    metricKey: "quality",
+    metricTitle: "质量打分",
+    system: "质检照片 图像识别",
+    cap: "图像识别",
+    pipeline: ["采集质检照片", "图像识别外观/缺件/铭牌", "输出缺陷标签", "自动扣分建议"],
+    summary: [
+      { label: "识别照片", value: "186 张" },
+      { label: "异常检出", value: "11 处" },
+      { label: "模型置信度", value: "94.1%" },
+    ],
+    columns: ["照片", "供应商", "识别结果", "缺陷类型", "置信度", "评分影响"],
+    rows: [
+      ["IQC_0318_01.jpg", "华东精密", "正常", "—", "97%", "无"],
+      ["IQC_0315_04.jpg", "南方电机", "异常", "外壳划痕", "93%", "图像异常 -1"],
+      ["IQC_0312_02.jpg", "长三角工控", "异常", "缺件：固定螺丝", "96%", "图像异常 -2"],
+      ["IQC_0309_07.jpg", "华北机电", "异常", "铭牌参数不符", "91%", "人工复核"],
+    ],
+    note: "图像异常检出数进入质量打分扣分，对应指标「图像异常检出数」。",
+  },
+  "quality-ocr": {
+    id: "quality-ocr",
+    metricKey: "quality",
+    metricTitle: "质量打分",
+    system: "物流 / 验收单据 OCR",
+    cap: "OCR",
+    pipeline: ["扫描验收单 / 装箱单", "OCR 抽取品名数量", "与 PO 行比对", "标记单据不一致"],
+    summary: [
+      { label: "识别单据", value: "72 张" },
+      { label: "一致率", value: "95.8%" },
+      { label: "不一致", value: "3 单" },
+    ],
+    columns: ["单据影像", "OCR 品名", "OCR 数量", "PO 数量", "一致性", "处理"],
+    rows: [
+      ["验收_0318.pdf", "工控电机 M3", "40", "40", "一致", "过账"],
+      ["装箱_0315.pdf", "伺服驱动 V2", "18", "20", "不一致", "短装复核"],
+      ["验收_0312.pdf", "编码器 E9", "30", "30", "一致", "过账"],
+      ["送货_0308.jpg", "联轴器套件", "15", "12", "不一致", "溢装退回"],
+    ],
+    note: "单据一致性指标由 OCR 与 PO 比对自动生成，纳入质量打分。",
+  },
+  "quality-return": {
+    id: "quality-return",
+    metricKey: "quality",
+    metricTitle: "质量打分",
+    system: "退换货单",
+    cap: "系统",
+    pipeline: ["汇总退换货申请", "统计闭环时长", "计算退货率", "下修质量分"],
+    summary: [
+      { label: "退换货单", value: "9 笔" },
+      { label: "退货率", value: "1.8%" },
+      { label: "闭环率", value: "100%" },
+    ],
+    columns: ["单号", "供应商", "原因", "数量", "闭环时长", "结果"],
+    rows: [
+      ["RMA-2602", "长三角工控", "功能不良", "3", "4 天", "已换货"],
+      ["RMA-2598", "南方电机", "外观损伤", "2", "2 天", "已退货"],
+      ["RMA-2581", "华北机电", "到货不符", "5", "6 天", "已补发"],
+      ["RMA-2570", "华东精密", "让步接收复检", "1", "1 天", "关闭"],
+    ],
+    note: "退换货闭环率与退货扣分直接进入质量打分。",
+  },
+  "cost-contract": {
+    id: "cost-contract",
+    metricKey: "cost",
+    metricTitle: "成本打分",
+    system: "合同文本 NLP",
+    cap: "NLP",
+    pipeline: ["导入合同 PDF", "NLP 抽取价格 / 账期条款", "结构化写入比价引擎", "计算协议价偏离"],
+    summary: [
+      { label: "解析合同", value: "17 份" },
+      { label: "条款抽取成功率", value: "98%" },
+      { label: "平均账期", value: "60 天" },
+    ],
+    columns: ["合同", "供应商", "抽取单价", "账期", "阶梯价", "置信度"],
+    rows: [
+      ["框架协议-华东-2025.pdf", "华东精密", "¥1,280 / 台", "60 天", "≥100 台 9.6 折", "97%"],
+      ["年度合同-南方.pdf", "南方电机", "¥2,450 / 套", "45 天", "无", "95%"],
+      ["补充协议-长三角.pdf", "长三角工控", "¥860 / 只", "90 天", "≥500 只 9.8 折", "96%"],
+      ["报价附件-华北.docx", "华北机电", "¥320 / 件", "30 天", "现款优惠 2%", "93%"],
+    ],
+    note: "NLP 抽取的协议价与账期配合度是成本打分核心输入。",
+  },
+  "cost-rfq": {
+    id: "cost-rfq",
+    metricKey: "cost",
+    metricTitle: "成本打分",
+    system: "询比价单 / PO",
+    cap: "系统",
+    pipeline: ["汇总询价与成交价", "对照协议价", "计算偏离度", "写入成本分"],
+    summary: [
+      { label: "比价单", value: "36 份" },
+      { label: "平均偏离", value: "+1.4%" },
+      { label: "低于协议价", value: "12 笔" },
+    ],
+    columns: ["询价单", "供应商", "报价", "协议价", "偏离", "成交"],
+    rows: [
+      ["RFQ-0311", "华东精密", "¥1,295", "¥1,280", "+1.2%", "是"],
+      ["RFQ-0308", "南方电机", "¥2,420", "¥2,450", "-1.2%", "是"],
+      ["RFQ-0302", "长三角工控", "¥890", "¥860", "+3.5%", "否"],
+      ["RFQ-0255", "华北机电", "¥318", "¥320", "-0.6%", "是"],
+    ],
+    note: "协议价偏离度由询比价与合同抽取价自动比对生成。",
+  },
+  "cost-market": {
+    id: "cost-market",
+    metricKey: "cost",
+    metricTitle: "成本打分",
+    system: "行业公开行情",
+    cap: "外部数据",
+    pipeline: ["接入品类价格指数", "识别波动区间", "评估供应商跟价弹性", "修正成本分"],
+    summary: [
+      { label: "跟踪品类", value: "6 个" },
+      { label: "近 30 日波动", value: "+2.8%" },
+      { label: "跟价滞后供应商", value: "1 家" },
+    ],
+    columns: ["品类", "指数", "30 日变化", "供应商跟价", "敏感度", "评分影响"],
+    rows: [
+      ["工控电机铜材相关", "112.4", "+3.1%", "华东精密同步", "中", "无惩罚"],
+      ["伺服驱动电子料", "108.9", "+1.6%", "南方电机部分跟价", "中", "轻微惩罚"],
+      ["编码器进口件", "121.0", "+4.8%", "长三角滞后", "高", "波动惩罚 -2"],
+      ["标准紧固件", "101.2", "+0.4%", "华北同步", "低", "无惩罚"],
+    ],
+    note: "行业波动敏感度作为成本打分的外部修正项。",
+  },
+  "rd-plm": {
+    id: "rd-plm",
+    metricKey: "rd",
+    metricTitle: "研发项目打分",
+    system: "PLM / 项目管理",
+    cap: "系统",
+    pipeline: ["同步项目里程碑", "统计按时完成率", "记录变更次数", "加权入研发分"],
+    summary: [
+      { label: "在研项目", value: "5 个" },
+      { label: "里程碑准时率", value: "86%" },
+      { label: "变更次数", value: "7" },
+    ],
+    columns: ["项目", "供应商", "里程碑", "计划日", "实际日", "状态"],
+    rows: [
+      ["GW-300 电机选型", "华东精密", "样机交付", "2026-02-28", "2026-02-27", "准时"],
+      ["EC-200 联调", "南方电机", "联调报告", "2026-03-10", "2026-03-14", "延期"],
+      ["编码器兼容性", "长三角工控", "样品确认", "2026-03-05", "2026-03-05", "准时"],
+      ["结构件试制", "华北机电", "模具验收", "2026-03-18", "—", "进行中"],
+    ],
+    note: "里程碑表现构成研发项目打分的项目协同主分。",
+  },
+  "rd-mail": {
+    id: "rd-mail",
+    metricKey: "rd",
+    metricTitle: "研发项目打分",
+    system: "邮件沟通 NLP",
+    cap: "NLP",
+    pipeline: ["抓取项目邮件", "NLP 识别技术答疑", "计算平均回复时长", "输出沟通配合度"],
+    summary: [
+      { label: "解析邮件", value: "156 封" },
+      { label: "平均回复", value: "4.1 小时" },
+      { label: "配合度得分", value: "88" },
+    ],
+    columns: ["主题", "供应商", "NLP 标签", "回复时长", "配合度", "备注"],
+    rows: [
+      ["RE: 样机接口确认", "华东精密", "技术答疑", "2.0h", "高", "附带图纸"],
+      ["RE: 联调异常排查", "南方电机", "问题跟进", "7.5h", "中", "需二次催促"],
+      ["RE: 编码器协议", "长三角工控", "资料提供", "3.2h", "高", "一次给齐"],
+      ["RE: 模具尺寸复核", "华北机电", "变更沟通", "5.0h", "中", "接受变更"],
+    ],
+    note: "沟通配合度由 NLP 平均回复时长与答疑完整度换算，计入研发打分。",
+  },
+  "rd-inspect": {
+    id: "rd-inspect",
+    metricKey: "rd",
+    metricTitle: "研发项目打分",
+    system: "巡检报告 NLP",
+    cap: "NLP",
+    pipeline: ["导入巡检 / 问题报告", "NLP 抽取问题条目", "跟踪整改闭环", "计算闭环率"],
+    summary: [
+      { label: "问题条目", value: "23" },
+      { label: "已闭环", value: "20" },
+      { label: "闭环率", value: "87%" },
+    ],
+    columns: ["报告", "供应商", "NLP 问题摘要", "责任", "状态", "闭环天"],
+    rows: [
+      ["巡检-0310.md", "华东精密", "安装孔位偏差 0.3mm", "供应商", "已闭环", "3"],
+      ["联调-0308.md", "南方电机", "噪声超标需调参", "双方", "已闭环", "5"],
+      ["试制-0301.md", "长三角工控", "固件版本不一致", "供应商", "进行中", "—"],
+      ["验收-0220.md", "华北机电", "表面处理色差", "供应商", "已闭环", "2"],
+    ],
+    note: "巡检问题闭环率体现问题解决能力，纳入研发项目打分。",
+  },
+  "rd-cert": {
+    id: "rd-cert",
+    metricKey: "rd",
+    metricTitle: "研发项目打分",
+    system: "样品 / 资质证书 OCR",
+    cap: "OCR",
+    pipeline: ["扫描样品报告与证书", "OCR 抽取参数与有效期", "与规格书比对", "输出符合率"],
+    summary: [
+      { label: "识别文件", value: "28 份" },
+      { label: "参数符合率", value: "92%" },
+      { label: "临期证书", value: "2 份" },
+    ],
+    columns: ["文件", "供应商", "OCR 关键参数", "规格要求", "符合", "有效期"],
+    rows: [
+      ["样品报告-电机.pdf", "华东精密", "额定扭矩 3.0Nm", "≥2.8Nm", "是", "—"],
+      ["CE证书-南方.jpg", "南方电机", "证书编号 CE-8821", "有效", "是", "2027-01"],
+      ["检测报告-编码.pdf", "长三角工控", "分辨率 2500PPR", "2500PPR", "是", "—"],
+      ["材质证明-华北.png", "华北机电", "有效期 2026-04", "≥12 个月", "临期", "2026-04"],
+    ],
+    note: "样品参数符合率经 OCR 自动比对后计入研发项目打分。",
+  },
+  "as-ticket": {
+    id: "as-ticket",
+    metricKey: "afterSales",
+    metricTitle: "售后打分",
+    system: "工单投诉 NLP",
+    cap: "NLP",
+    pipeline: ["采集售后工单文本", "NLP 抽取诉求与情绪", "计算回复时长", "统计投诉闭环率"],
+    summary: [
+      { label: "工单数", value: "42" },
+      { label: "平均回复", value: "2.4 小时" },
+      { label: "投诉闭环率", value: "95%" },
+    ],
+    columns: ["工单号", "供应商", "NLP 诉求", "回复时长", "闭环", "情绪"],
+    rows: [
+      ["TK-8840", "华东精密", "现场调试支持", "1.2h", "已闭环", "中性"],
+      ["TK-8821", "南方电机", "保修换件延迟", "5.5h", "已闭环", "负面"],
+      ["TK-8799", "长三角工控", "安装说明不清", "2.0h", "已闭环", "中性"],
+      ["TK-8760", "华北机电", "重复故障", "3.8h", "处理中", "负面"],
+    ],
+    note: "平均回复时长与投诉闭环率是售后打分的核心量化指标。",
+  },
+  "as-cs": {
+    id: "as-cs",
+    metricKey: "afterSales",
+    metricTitle: "售后打分",
+    system: "客服记录 NLP",
+    cap: "NLP",
+    pipeline: ["导入客服会话", "NLP 评估配合度", "识别升级次数", "输出沟通分"],
+    summary: [
+      { label: "会话数", value: "68" },
+      { label: "沟通配合度", value: "90" },
+      { label: "升级次数", value: "4" },
+    ],
+    columns: ["会话 ID", "供应商", "NLP 摘要", "配合度", "升级", "结果"],
+    rows: [
+      ["CS-2210", "华东精密", "主动预约上门", "高", "0", "满意"],
+      ["CS-2198", "南方电机", "多次催促才答复", "中", "1", "勉强解决"],
+      ["CS-2175", "长三角工控", "资料一次给齐", "高", "0", "满意"],
+      ["CS-2150", "华北机电", "推诿责任", "低", "2", "升级处理"],
+    ],
+    note: "沟通配合度由客服 NLP 自动评分，并入售后打分。",
+  },
+  "as-claim": {
+    id: "as-claim",
+    metricKey: "afterSales",
+    metricTitle: "售后打分",
+    system: "退换货 / 索赔单",
+    cap: "系统",
+    pipeline: ["汇总索赔与退换", "统计一次解决率", "计算闭环时长", "回写售后分"],
+    summary: [
+      { label: "索赔单", value: "11" },
+      { label: "一次解决率", value: "82%" },
+      { label: "平均闭环", value: "3.6 天" },
+    ],
+    columns: ["单号", "供应商", "类型", "闭环天", "一次解决", "金额"],
+    rows: [
+      ["CL-2603", "华东精密", "换货", "2", "是", "¥0"],
+      ["CL-2590", "南方电机", "索赔", "5", "否", "¥3,200"],
+      ["CL-2577", "长三角工控", "退货", "3", "是", "¥1,100"],
+      ["CL-2561", "华北机电", "补件", "4", "是", "¥0"],
+    ],
+    note: "一次解决率与闭环时长对应售后打分中的问题解决能力。",
+  },
+  "as-crm": {
+    id: "as-crm",
+    metricKey: "afterSales",
+    metricTitle: "售后打分",
+    system: "CRM 回访",
+    cap: "系统",
+    pipeline: ["发起现场回访", "采集满意度", "关联供应商服务单", "修正售后分"],
+    summary: [
+      { label: "回访单", value: "24" },
+      { label: "满意度", value: "4.4 / 5" },
+      { label: "愿复购", value: "88%" },
+    ],
+    columns: ["回访号", "供应商", "现场支持", "满意度", "复购意愿", "备注"],
+    rows: [
+      ["VF-310", "华东精密", "准时到场", "5", "高", "工程师专业"],
+      ["VF-302", "南方电机", "迟到 40 分钟", "3", "中", "需改进响应"],
+      ["VF-288", "长三角工控", "远程解决", "4", "高", "—"],
+      ["VF-271", "华北机电", "二次上门", "4", "中", "备件不齐"],
+    ],
+    note: "现场支持满意度作为售后履约的辅助修正。",
+  },
+  "comp-cert": {
+    id: "comp-cert",
+    metricKey: "compliance",
+    metricTitle: "合规与韧性（并入等级）",
+    system: "资质证书 OCR",
+    cap: "OCR",
+    pipeline: ["扫描资质影像", "OCR 识别证号与有效期", "比对临期 / 过期", "触发等级修正告警"],
+    summary: [
+      { label: "识别证书", value: "39 份" },
+      { label: "有效", value: "36" },
+      { label: "临期 / 过期", value: "3" },
+    ],
+    columns: ["影像", "供应商", "证书类型", "OCR 有效期", "状态", "等级影响"],
+    rows: [
+      ["营业执照-华东.jpg", "华东精密", "营业执照", "长期", "有效", "无"],
+      ["ISO9001-南方.pdf", "南方电机", "ISO9001", "2026-06-30", "临期", "告警"],
+      ["授权书-长三角.png", "长三角工控", "品牌授权", "2025-12-31", "过期", "限制推荐"],
+      ["环评-华北.jpg", "华北机电", "环评批复", "2028-01-01", "有效", "无"],
+    ],
+    note: "资质过期告警由 OCR 自动识别，用于等级修正而非五维加权。",
+  },
+  "comp-legal": {
+    id: "comp-legal",
+    metricKey: "compliance",
+    metricTitle: "合规与韧性（并入等级）",
+    system: "司法 / 行政处罚公开数据",
+    cap: "外部数据",
+    pipeline: ["对接公开司法 / 处罚库", "按供应商主体匹配", "输出命中记录", "触发等级下调"],
+    summary: [
+      { label: "扫描主体", value: "42 家" },
+      { label: "命中记录", value: "2 条" },
+      { label: "高风险", value: "1 家" },
+    ],
+    columns: ["供应商", "数据类型", "公开摘要", "日期", "风险", "处理"],
+    rows: [
+      ["长三角工控", "行政处罚", "消防备案逾期罚款", "2025-11", "中", "观察"],
+      ["华北机电", "司法涉诉", "货款纠纷已调解", "2024-08", "低", "备案"],
+      ["南方电机", "—", "无命中", "—", "低", "正常"],
+      ["华东精密", "—", "无命中", "—", "低", "正常"],
+    ],
+    note: "涉诉 / 处罚命中用于合规韧性等级修正。",
+  },
+  "comp-news": {
+    id: "comp-news",
+    metricKey: "compliance",
+    metricTitle: "合规与韧性（并入等级）",
+    system: "环保与行业舆情",
+    cap: "外部数据",
+    pipeline: ["监测舆情与环保通报", "NLP 情感与事件分类", "评估供给中断风险", "写入韧性评分"],
+    summary: [
+      { label: "监测条目", value: "120+" },
+      { label: "负面舆情", value: "3" },
+      { label: "供给风险", value: "中低" },
+    ],
+    columns: ["时间", "供应商 / 产区", "事件摘要", "情感", "供给影响", "韧性建议"],
+    rows: [
+      ["2026-03-01", "华东精密产区", "园区限电传闻澄清", "中性", "低", "继续观察"],
+      ["2026-02-18", "南方电机", "环保抽查通过", "正面", "无", "维持"],
+      ["2026-02-02", "长三角工控上游", "关键原料涨价舆情", "负面", "中", "备选分流"],
+      ["2026-01-20", "华北机电", "无重大舆情", "中性", "无", "维持"],
+    ],
+    note: "舆情风险等级用于供应链韧性修正，并入综合等级判断。",
+  },
+};
 
 export const PERF_AI_CALLS = [
   {

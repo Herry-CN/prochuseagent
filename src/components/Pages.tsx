@@ -1,12 +1,16 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   BOARD_COLUMNS,
   CATEGORY_ROWS,
   CERT_ROWS,
   DEMAND_ROWS,
-  PERF_AI_CALLS,
   PERF_CHAIN,
+  PERF_GRADE_RULES,
   PERF_ROWS,
   PERF_SCORE_SOURCES,
+  PERF_SOURCE_DETAILS,
+  gradeTone,
+  type PerfGrade,
   PO_ROWS,
   PORTFOLIO_ROWS,
   SOURCE_ROWS,
@@ -182,8 +186,55 @@ export function Category({
 
 export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void }) {
   const tabs: SrmTab[] = ["寻源任务", "供应商认证", "绩效评价", "供应商组合"];
+  const [sourceDetailId, setSourceDetailId] = useState<string | null>(null);
+  const [perfActionName, setPerfActionName] = useState<string | null>(null);
+  const [doneActions, setDoneActions] = useState<Record<string, boolean>>({});
+  const sourceDetail = sourceDetailId ? PERF_SOURCE_DETAILS[sourceDetailId] : null;
+  const perfAction = PERF_ROWS.find((r) => r.name === perfActionName) || null;
+  const contentRef = useRef<HTMLDivElement>(null);
+  const savedScrollRef = useRef(0);
+
+  useEffect(() => {
+    if (tab !== "绩效评价") {
+      setSourceDetailId(null);
+      setPerfActionName(null);
+    }
+  }, [tab]);
+
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    if (sourceDetailId || perfActionName) {
+      el.scrollTop = 0;
+    } else {
+      el.scrollTop = savedScrollRef.current;
+    }
+  }, [sourceDetailId, perfActionName]);
+
+  const rememberScroll = () => {
+    if (contentRef.current) savedScrollRef.current = contentRef.current.scrollTop;
+  };
+
+  const openSourceDetail = (id: string) => {
+    rememberScroll();
+    setPerfActionName(null);
+    setSourceDetailId(id);
+  };
+
+  const openPerfAction = (name: string) => {
+    rememberScroll();
+    setSourceDetailId(null);
+    setDoneActions({});
+    setPerfActionName(name);
+  };
+
+  const backToPerfList = () => {
+    setSourceDetailId(null);
+    setPerfActionName(null);
+  };
+
   return (
-    <div className="content">
+    <div className="content" ref={contentRef}>
       <div className="page-head">
         <div>
           <h2>SRM 供应商管理</h2>
@@ -209,7 +260,7 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
           <h3>
             {tab === "寻源任务" && "寻源任务与选择策略"}
             {tab === "供应商认证" && "认证与准入"}
-            {tab === "绩效评价" && "绩效评价与反馈"}
+            {tab === "绩效评价" && (sourceDetail ? "数据来源明细" : perfAction ? "绩效策略动作" : "绩效评价与反馈")}
             {tab === "供应商组合" && "供应商组合"}
           </h3>
           <span>
@@ -305,18 +356,128 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
             </div>
           </>
         )}
-        {tab === "绩效评价" && (
+        {tab === "绩效评价" && sourceDetail && (
           <>
-            <div className="ai-calls">
-              {PERF_AI_CALLS.map((c) => (
-                <div className="ai-call" key={c.id}>
-                  <span className="ai-badge">AI 调用</span>
-                  <div>
-                    <b>{c.title}</b>
-                    <p>{c.text}</p>
-                  </div>
+            <div className="source-detail-head">
+              <button type="button" className="primary source-back-btn" onClick={backToPerfList}>
+                ← 返回数据来源
+              </button>
+              <div className="source-detail-title">
+                <span className="ai-badge">{sourceDetail.cap}</span>
+                <div>
+                  <h3>{sourceDetail.metricTitle} · {sourceDetail.system}</h3>
+                  <p>仿真明细：演示 AI 自动抽取后回写至「{sourceDetail.metricTitle}」</p>
+                </div>
+              </div>
+            </div>
+            <div className="source-pipeline">
+              {sourceDetail.pipeline.map((step, i) => (
+                <div className="source-pipeline-step" key={step}>
+                  <em>{String(i + 1).padStart(2, "0")}</em>
+                  <span>{step}</span>
                 </div>
               ))}
+            </div>
+            <div className="kpis risk-kpis">
+              {sourceDetail.summary.map((s) => (
+                <div className="kpi" key={s.label}><span>{s.label}</span><b>{s.value}</b></div>
+              ))}
+            </div>
+            <table className="data">
+              <thead>
+                <tr>
+                  {sourceDetail.columns.map((c) => <th key={c}>{c}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {sourceDetail.rows.map((row, i) => (
+                  <tr key={`${sourceDetail.id}-${i}`}>
+                    {row.map((cell, j) => <td key={`${i}-${j}`}>{cell}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="note">
+              <span className="ai-badge">回写指标</span>
+              &nbsp;{sourceDetail.note}
+            </div>
+          </>
+        )}
+        {tab === "绩效评价" && perfAction && !sourceDetail && (
+          <>
+            <div className="source-detail-head">
+              <button type="button" className="primary source-back-btn" onClick={backToPerfList}>
+                ← 返回绩效列表
+              </button>
+              <div className="source-detail-title">
+                <span className={`pill ${gradeTone(perfAction.grade as PerfGrade)}`}>
+                  {perfAction.grade} · {perfAction.gradeLabel}
+                </span>
+                <div>
+                  <h3>{perfAction.name} · 综合分 {perfAction.total}</h3>
+                  <p>按 A/B/C/D 分级规则自动生成处理策略，并进入下一步动作</p>
+                </div>
+              </div>
+            </div>
+            <div className="perf-grade-cards">
+              <div className="perf-grade-card">
+                <span>份额策略</span>
+                <b>{perfAction.share}</b>
+              </div>
+              <div className="perf-grade-card">
+                <span>商务与合作待遇</span>
+                <b>{perfAction.treatment}</b>
+              </div>
+              <div className="perf-grade-card">
+                <span>改进要求</span>
+                <b>{perfAction.improve}</b>
+              </div>
+            </div>
+            <div className="note">
+              <span className="ai-badge">自动策略</span>
+              &nbsp;{perfAction.strategy}。{perfAction.note}
+            </div>
+            <div className="panel-head" style={{ marginTop: 8 }}>
+              <h3>下一步动作</h3>
+              <span>按策略自动拆分执行任务</span>
+            </div>
+            <div className="action-list">
+              {perfAction.actions.map((a, i) => {
+                const key = `${perfAction.name}-${i}`;
+                const done = Boolean(doneActions[key]);
+                return (
+                  <div className="action-item" key={key}>
+                    <em>动作 {i + 1}</em>
+                    <b>{a.who}</b>
+                    <p>{a.text}</p>
+                    <button
+                      type="button"
+                      className={done ? "ghost" : "table-btn"}
+                      style={{ marginTop: 8 }}
+                      onClick={() => setDoneActions((prev) => ({ ...prev, [key]: true }))}
+                    >
+                      {done ? "已执行 ✓" : "执行 →"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="note">份额调整比例与整改周期为示例规则，正式发布后写入《供应商绩效管理制度》强制执行。</div>
+          </>
+        )}
+        {tab === "绩效评价" && !sourceDetail && !perfAction && (
+          <>
+            <div className="perf-grade-legend">
+              {(Object.keys(PERF_GRADE_RULES) as PerfGrade[]).map((g) => {
+                const rule = PERF_GRADE_RULES[g];
+                return (
+                  <div className={`perf-legend-item tone-${g}`} key={g}>
+                    <b>{g} · {rule.label}</b>
+                    <span>{rule.range}</span>
+                    <p>{rule.strategy}</p>
+                  </div>
+                );
+              })}
             </div>
             <table className="data">
               <thead>
@@ -329,7 +490,8 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
                   <th>售后打分</th>
                   <th>综合分</th>
                   <th>等级</th>
-                  <th>策略</th>
+                  <th>自动策略</th>
+                  <th>下一步</th>
                 </tr>
               </thead>
               <tbody>
@@ -351,32 +513,66 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
                     <td><span className="score-num">{r.rd}</span></td>
                     <td><span className="score-num">{r.afterSales}</span></td>
                     <td><span className="score-num">{r.total}</span></td>
-                    <td><Pill tone={r.grade.startsWith("A") ? "ok" : "warn"}>{r.grade}</Pill></td>
+                    <td>
+                      <Pill tone={gradeTone(r.grade)}>{`${r.grade} · ${r.gradeLabel}`}</Pill>
+                    </td>
                     <td>
                       {r.strategy}
-                      <div className="score-raw">AI 输出</div>
+                      <div className="score-raw">按分数自动生成</div>
+                    </td>
+                    <td>
+                      <button type="button" className="table-btn" onClick={() => openPerfAction(r.name)}>
+                        进入动作 →
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <div className="note">
-              交期分、质量分由准时率、质量合格率线性换算，与成本、研发、售后一并加权。交期分低于 90 限制紧急单；综合分 ≥95 为 A，90–94 为 A-，80–89 为 B。
+              综合分按五维加权；分级规则：A ≥90 卓越，B 80–89 良好，C 70–79 待改进，D &lt;70 不合格。等级自动映射份额策略、商务待遇与改进要求，并可进入下一步动作。
             </div>
-            <ul className="perf-notes">
-              {PERF_ROWS.map((r) => (
-                <li key={r.name}><b>{r.name}</b>{r.note}</li>
-              ))}
-            </ul>
+
+            <div className="panel-head" style={{ marginTop: 16 }}>
+              <h3>绩效分级规则 · 分数直接对应管理动作</h3>
+              <span>示例规则，正式发布后写入制度强制执行</span>
+            </div>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>等级</th>
+                  <th>分数区间</th>
+                  <th>份额策略</th>
+                  <th>商务与合作待遇</th>
+                  <th>改进要求</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(Object.keys(PERF_GRADE_RULES) as PerfGrade[]).map((g) => {
+                  const rule = PERF_GRADE_RULES[g];
+                  return (
+                    <tr key={g}>
+                      <td><Pill tone={gradeTone(g)}>{`${g} · ${rule.label}`}</Pill></td>
+                      <td>{rule.range}</td>
+                      <td>{rule.share}</td>
+                      <td>{rule.treatment}</td>
+                      <td>{rule.improve}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="note">
+              份额调整比例与整改周期为示例规则，正式写入《供应商绩效管理制度》后强制执行，不因个案协商改变。
+            </div>
 
             <div className="panel-head" style={{ marginTop: 16 }}>
               <h3>全链路动态评估</h3>
-              <span className="ai-inline">AI 调用 · 换算与回写</span>
+              <span className="ai-inline">换算与回写</span>
             </div>
             <div className="perf-chain">
               {PERF_CHAIN.map((c) => (
                 <div className={`perf-chain-item${c.ai ? " ai" : ""}`} key={c.step}>
-                  {c.ai && <em className="ai-badge">AI</em>}
                   <div className="perf-chain-step">{c.step}</div>
                   <b>{c.title}</b>
                   <span>{c.metric}</span>
@@ -387,7 +583,7 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
 
             <div className="panel-head" style={{ marginTop: 16 }}>
               <h3>数据来源与换算</h3>
-              <span className="ai-inline">相对传统评估 · AI 能力拆入各打分项</span>
+              <span className="ai-inline">点击下方数据来源查看 AI 抽取明细</span>
             </div>
             <div className="source-grid">
               {PERF_SCORE_SOURCES.map((block) => (
@@ -395,7 +591,6 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
                   <div className="source-card-head">
                     <h4>{block.title}</h4>
                     <span className="chip">{block.weight}</span>
-                    {block.ai && <span className="ai-badge">AI 调用</span>}
                   </div>
                   <div className="cap-row">
                     {block.caps.map((c) => (
@@ -415,33 +610,31 @@ export function SRM({ tab, onTab }: { tab: SrmTab; onTab: (t: SrmTab) => void })
                   </div>
                   <div className="source-label">
                     {block.raw === "准时率" || block.raw === "质量合格率"
-                      ? `${block.raw} 数据来源`
-                      : "模型建议数据来源"}
+                      ? `${block.raw} 数据来源 · 可下钻`
+                      : "模型建议数据来源 · 可下钻"}
                   </div>
                   <ul className="source-list">
                     {block.sources.map((s) => (
-                      <li key={s.system}>
-                        <b>{s.system}</b>
-                        <span>{s.field}</span>
+                      <li key={s.id}>
+                        <button
+                          type="button"
+                          className="source-link"
+                          onClick={() => openSourceDetail(s.id)}
+                        >
+                          <span className="source-link-main">
+                            <b>{s.system}</b>
+                            <span>{s.field}</span>
+                          </span>
+                          <span className="source-link-go">
+                            <em className="cap-tag">{s.cap}</em>
+                            明细 →
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
                 </div>
               ))}
-            </div>
-
-            <div className="check-card">
-              <div className="panel-head">
-                <h3>完整性检查</h3>
-                <span>相对传统绩效评估的差异已拆入各打分项</span>
-              </div>
-              <ul className="check-list">
-                <li>五维均为 0–100 分；合规与韧性作为等级修正，不挤占五维权重。</li>
-                <li>NLP → 交期催货、成本合同、研发邮件/巡检、售后工单/客服。</li>
-                <li>OCR / 图像 → 交期货运单据、质量质检照片、研发/合规资质证书。</li>
-                <li>外部公开数据 → 成本行业波动、合规司法/处罚/舆情与供应链韧性。</li>
-                <li>量化指标已落到各打分项：平均回复时长、投诉闭环率、图像异常、资质过期等。</li>
-              </ul>
             </div>
           </>
         )}
