@@ -77,6 +77,17 @@ export function Home({
           ))}
         </div>
       </div>
+      <div className="home-author">
+        <div className="home-author-line">
+          <span>作者</span>
+          <b>Herry</b>
+        </div>
+        <div className="home-author-line">
+          <span>联系方式</span>
+          <b>微信号：LyraHerry</b>
+          <a href="mailto:12912697@qq.com">邮箱：12912697@qq.com</a>
+        </div>
+      </div>
     </div>
   );
 }
